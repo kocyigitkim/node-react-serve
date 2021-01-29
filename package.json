@@ -1,0 +1,32 @@
+{
+  "name": "node-react-serve",
+  "version": "1.0.0",
+  "description": "React Server for Node.JS & Express",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/muhammetkocyigit0/node-react-serve.git"
+  },
+  "keywords": [
+    "React",
+    "React.JS",
+    "js",
+    "node",
+    "express",
+    "server",
+    "serve"
+  ],
+  "author": "muhammetkocyigit0@gmail.com",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/muhammetkocyigit0/node-react-serve/issues"
+  },
+  "homepage": "https://github.com/muhammetkocyigit0/node-react-serve#readme",
+  "dependencies": {
+    "express": "^4.17.1",
+    "node-fetch": "^2.6.1"
+  }
+}
