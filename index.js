@@ -73,8 +73,16 @@ function InitDevelopmentServer(app, basePath, port) {
   });
 }
 
+/**
+ * 
+ * @param {Object} app 
+ * @param {String} basePath 
+ * @param {String} clientPath 
+ * @param {Number} port 
+ * @param {Boolean} disableAutoStartDevServer 
+ */
 async function UseReactServer(app, basePath = "/", clientPath = null, port = 3000, disableAutoStartDevServer = true) {
-  var buildpath = path.join(__dirname, clientPath, "build");
+  var buildpath = path.join(process.cwd(), clientPath, "build");
   if (fs.existsSync(buildpath)) {
     InitProductionServer(app, basePath, buildpath);
   } else {
