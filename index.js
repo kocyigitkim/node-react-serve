@@ -22,8 +22,8 @@ function InitProductionServer(app, basePath, buildPath, port) {
     //res.sendFile(path.join(buildPath, "index.html"));
     var baseUrl = req.originalUrl || req.baseUrl || req.url;
     baseUrl = baseUrl.replace(/\/\//g, "/");
-    var mresult = baseUrl.match(rMatchFilePath);
-    console.log('Fetching: ' + baseUrl);
+    //var mresult = baseUrl.match(rMatchFilePath);
+    //console.log('Fetching: ' + baseUrl);
     const filePath = path.join(buildPath, baseUrl);
     const extension = path.extname(baseUrl);
     if (fs.existsSync(filePath) && extension && extension.length >= 1) {
