@@ -17,7 +17,7 @@ function InitProductionServer(app, basePath, buildPath, port) {
       '$1="' + basePath + '$2.$3"'
   );
 
-  app.use("*", (req, res, next) => {
+  app.use(basePath + "*", (req, res, next) => {
 
     //res.sendFile(path.join(buildPath, "index.html"));
     var baseUrl = req.originalUrl || req.baseUrl || req.url;
@@ -41,7 +41,7 @@ function InitProductionServer(app, basePath, buildPath, port) {
 }
 
 function InitDevelopmentServer(app, basePath, port) {
-  app.use("/*", async (req, res, next) => {
+  app.use(basePath + "*", async (req, res, next) => {
     var _newpath = req.baseUrl.toString().replace(/\/\//g, "/");
     basePath = basePath.replace(/\/\//g, "/");
     if (basePath.startsWith("/")) {
