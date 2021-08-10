@@ -1,6 +1,6 @@
 {
   "name": "node-react-serve",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "React Server for Node.JS & Express",
   "main": "index.js",
   "scripts": {

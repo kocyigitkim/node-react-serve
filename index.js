@@ -2,28 +2,41 @@ const { default: fetch } = require("node-fetch");
 const path = require("path");
 const fs = require("fs");
 const express = require("express");
+const rMatchFilePath = /([^\":]+)\.(js|s?css|ico|icon|bmp|jpg|png|zip|gif|svg|pdf|docx|doc|xls|xlsx|xlsm|ppt|pptx|txt|json|xml|chunk|ttf|woff|woff2|map)/g;
+const rMatchFile = /(href|src)=\"([^\":]+)\.(js|s?css|ico|icon|bmp|jpg|zip|png|svg|gif|pdf|docx|doc|xls|xlsx|xlsm|ppt|pptx|txt|json|xml|chunk|ttf|woff|woff2|map)\"/g;
 
-function InitProductionServer(app, basePath, buildPath, port) {
-  var indexHTMLSource = fs.readFileSync(
-      path.join(buildPath, "index.html"),
-      "utf-8"
-  );
-  var rMatchFilePath = /([^\":]+)\.(js|s?css|ico|icon|bmp|jpg|png|zip|gif|svg|pdf|docx|doc|xls|xlsx|xlsm|ppt|pptx|txt|json|xml|chunk|ttf|woff|woff2|map)/g;
-  var rMatchFile = /(href|src)=\"([^\":]+)\.(js|s?css|ico|icon|bmp|jpg|zip|png|svg|gif|pdf|docx|doc|xls|xlsx|xlsm|ppt|pptx|txt|json|xml|chunk|ttf|woff|woff2|map)\"/g;
+var registeredBasePaths = [];
+
+function rebuildHTMLIndex(source, basePath) {
+  indexHTMLSource = source;
   if (basePath.endsWith("/"))
     basePath = basePath.substr(0, basePath.length - 1);
   indexHTMLSource = indexHTMLSource.replace(
-      rMatchFile,
-      '$1="' + basePath + '$2.$3"'
+    rMatchFile,
+    '$1="' + basePath + '$2.$3"'
   );
+  return indexHTMLSource;
+}
+
+function InitProductionServer(app, basePath, buildPath, port) {
+  var indexHTMLSource = rebuildHTMLIndex(fs.readFileSync(
+    path.join(buildPath, "index.html"),
+    "utf-8"
+  ), ("/" + basePath).replace(/\/\//g, "/"));
+
 
   app.use(basePath + "*", (req, res, next) => {
 
-    //res.sendFile(path.join(buildPath, "index.html"));
     var baseUrl = req.originalUrl || req.baseUrl || req.url;
     baseUrl = baseUrl.replace(/\/\//g, "/");
-    //var mresult = baseUrl.match(rMatchFilePath);
-    //console.log('Fetching: ' + baseUrl);
+    const referer = req.headers.referer;
+    if (referer && referer.length > 0) {
+      var pathname = new URL(referer).pathname;
+      var longPath = registeredBasePaths.filter(bp => pathname.toLowerCase().startsWith(bp[0].toLowerCase())).sort((a, b) => a[0].length - b[0].length).reverse()[0];
+      basePath = longPath[0];
+      if (!baseUrl.toLowerCase().startsWith(longPath[0].toLowerCase())) _newpath = longPath[0] + baseUrl;
+    }
+    
     const filePath = path.join(buildPath, baseUrl);
     const extension = path.extname(baseUrl);
     if (fs.existsSync(filePath) && extension && extension.length >= 1) {
@@ -43,6 +56,14 @@ function InitProductionServer(app, basePath, buildPath, port) {
 function InitDevelopmentServer(app, basePath, port) {
   app.use(basePath + "*", async (req, res, next) => {
     var _newpath = req.baseUrl.toString().replace(/\/\//g, "/");
+    const referer = req.headers.referer;
+    if (referer && referer.length > 0) {
+      var pathname = new URL(referer).pathname;
+      var longPath = registeredBasePaths.filter(bp => pathname.toLowerCase().startsWith(bp[0].toLowerCase())).sort((a, b) => a[0].length - b[0].length).reverse()[0];
+      basePath = longPath[0];
+      port = longPath[1];
+      if (!_newpath.toLowerCase().startsWith(longPath[0].toLowerCase())) _newpath = longPath[0] + _newpath;
+    }
     basePath = basePath.replace(/\/\//g, "/");
     if (basePath.startsWith("/")) {
       basePath = basePath.substr(1);
@@ -53,20 +74,33 @@ function InitDevelopmentServer(app, basePath, port) {
     if (_newpath.toLowerCase().startsWith(basePath.toLowerCase())) {
       _newpath = _newpath.substr(basePath.length);
     }
+    var isIndex = false;
+    if (_newpath.trim().length === 0) {
+      isIndex = true;
+    }
     _newpath = "/" + _newpath;
+
 
     var _res = await fetch("http://localhost:" + port + _newpath, {
       method: req.method,
       headers: req.headers,
-    }).catch((p) => { });
+    }).catch(console.error);
     if (_res) {
       for (var h of _res.headers.keys()) {
         var v = _res.headers.get(h);
         if (h != "content-encoding") res.setHeader(h, v);
       }
-      var _resbody = _res.body;
-      res.status(_res.status);
-      _resbody.pipe(res);
+      if (isIndex) {
+        var indexSource = await _res.text().catch(console.error);
+        res.setHeader("content-type", "text/html; charset=utf-8");
+        res.status(200);
+        res.send(rebuildHTMLIndex(indexSource, ("/" + basePath).replace(/\/\//g, "/")));
+      }
+      else {
+        var _resbody = _res.body;
+        res.status(_res.status);
+        _resbody.pipe(res);
+      }
     } else {
       res.send("404");
     }
@@ -82,6 +116,7 @@ function InitDevelopmentServer(app, basePath, port) {
  * @param {Boolean} disableAutoStartDevServer 
  */
 async function UseReactServer(app, basePath = "/", clientPath = null, port = 3000, disableAutoStartDevServer = true) {
+  registeredBasePaths.push([basePath, port]);
   var buildpath = path.join(process.cwd(), clientPath, "build");
   if (fs.existsSync(buildpath)) {
     InitProductionServer(app, basePath, buildpath);
@@ -94,9 +129,9 @@ async function UseReactServer(app, basePath = "/", clientPath = null, port = 300
         var _client = path.join(__dirname, "client");
         if (clientPath) _client = clientPath;
         var c = new cmd(
-            /^win/.test(process.platform) ? "npm.cmd" : "npm",
-            ["run", "start"],
-            _client
+          /^win/.test(process.platform) ? "npm.cmd" : "npm",
+          ["run", "start"],
+          _client
         );
         c.start();
       }
