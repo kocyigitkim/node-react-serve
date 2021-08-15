@@ -9,12 +9,18 @@ const rMatchFile = /(href|src)=\"([^\":]+)\.(js|s?css|ico|icon|bmp|jpg|zip|png|s
 var registeredBasePaths = [];
 
 function rebuildHTMLIndex(source, basePath) {
+  /** @type {string} */
   indexHTMLSource = source;
   if (basePath.endsWith("/"))
     basePath = basePath.substr(0, basePath.length - 1);
   indexHTMLSource = indexHTMLSource.replace(
     rMatchFile,
-    '$1="' + basePath + '$2.$3"'
+    (match, propName, fileName, fileType, offset) => {
+      if (fileName.startsWith(basePath)) {
+        return match;
+      }
+      return `${propName}="${basePath}${fileName}.${fileType}"`;
+    }
   );
   return indexHTMLSource;
 }
@@ -53,35 +59,35 @@ function InitProductionServer(app, basePath, buildPath, port) {
   });
 }
 function InitReactWebSocket(app, basePath, port) {
-    const b = new ws(`ws://localhost:${port}/sockjs-node`, {});
-    const wss = new ws.Server({ server: app, path: '/sockjs-node' });
-  
-  
-    app.use(async (req, res, next) => {
-  
-      if (req.url === "/sockjs-node") {
-  
-        wss.handleUpgrade(req, req.socket, req.headers, async (ws) => {
-          b.emit(ws);
-          ws.on('message', (message) => {
-            b.send(message);
-          });
-          b.on('message', (message) => {
-            var msg = message.toJSON();
-            var result = {};
-            var decoded = Buffer.from(msg, { encoding: 'utf-8' });
-  
-            ws.send(decoded.toString("utf-8"));
-          });
+  const b = new ws(`ws://localhost:${port}/sockjs-node`, {});
+  const wss = new ws.Server({ server: app, path: '/sockjs-node' });
+
+
+  app.use(async (req, res, next) => {
+
+    if (req.url === "/sockjs-node") {
+
+      wss.handleUpgrade(req, req.socket, req.headers, async (ws) => {
+        b.emit(ws);
+        ws.on('message', (message) => {
+          b.send(message);
         });
-  
-  
-        return;
-  
-      }
-      next();
-    });
-  }
+        b.on('message', (message) => {
+          var msg = message.toJSON();
+          var result = {};
+          var decoded = Buffer.from(msg, { encoding: 'utf-8' });
+
+          ws.send(decoded.toString("utf-8"));
+        });
+      });
+
+
+      return;
+
+    }
+    next();
+  });
+}
 
 function InitReactWebSocket(app, basePath, port) {
   const b = new ws(`ws://localhost:${port}/sockjs-node`, {});
@@ -129,33 +135,41 @@ function InitDevelopmentServer(app, basePath, port) {
     var _newpath = req.baseUrl.toString().replace(/\/\//g, "/");
     const referer = req.headers.referer;
     var longPath = [];
-    if (referer && referer.length > 0) {
-      var pathname = new URL(referer).pathname;
-      try {
-        longPath = registeredBasePaths.filter(bp => pathname.toLowerCase().startsWith(bp[0].toLowerCase())).sort((a, b) => a[0].length - b[0].length).reverse()[0];
-        basePath = longPath[0];
-        port = longPath[1];
-        if (!_newpath.toLowerCase().startsWith(longPath[0].toLowerCase())) _newpath = longPath[0] + _newpath;
-      } catch (err) {
-        console.error(err);
-      }
-    }
-    if ((!referer || longPath.length === 0) && !_newpath.toLowerCase().startsWith(basePath.toLowerCase())) {
-      next();
-      return;
-    }
     basePath = basePath.replace(/\/\//g, "/");
+
     if (basePath.startsWith("/")) {
       basePath = basePath.substr(1);
     }
     if (_newpath.startsWith("/")) {
       _newpath = _newpath.substr(1);
     }
-    if (_newpath.toLowerCase().startsWith(basePath.toLowerCase())) {
-      _newpath = _newpath.substr(basePath.length);
+
+    if (referer && referer.length > 0) {
+      var pathname = new URL(referer).pathname;
+      try {
+        longPath = registeredBasePaths.filter(bp => pathname.toLowerCase().startsWith(bp[0].toLowerCase())).sort((a, b) => a[0].length - b[0].length).reverse()[0];
+        basePath = longPath[0];
+        port = longPath[1];
+        if (basePath.startsWith("/")) {
+          basePath = basePath.substr(1);
+        }
+
+        if (!_newpath.toLowerCase().startsWith(basePath.toLowerCase())) {
+          //     _newpath = basePath + _newpath;
+        }
+
+      } catch (err) {
+        console.error(err);
+      }
     }
-    else {
-      _newpath = "/" + _newpath;
+
+    if ((!referer || longPath.length === 0) && !_newpath.toLowerCase().startsWith(basePath.toLowerCase())) {
+      next();
+      return;
+    }
+
+    if (_newpath.startsWith("/")) {
+      _newpath = _newpath.substr(1);
     }
     var isIndex = false;
     if (_newpath.trim().length === 0) {
@@ -165,6 +179,7 @@ function InitDevelopmentServer(app, basePath, port) {
     if (_newpath.indexOf(".") === -1) {
       isIndex = true;
     }
+    if (!_newpath.startsWith("/")) _newpath = "/" + _newpath;
 
     var _res = await fetch("http://localhost:" + port.toString() + _newpath, {
       method: req.method,
