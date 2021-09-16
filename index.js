@@ -5,16 +5,17 @@ const express = require("express");
 const ws = require('ws');
 const rMatchFilePath = /([^\":]+)\.(js|s?css|ico|icon|bmp|jpg|png|zip|gif|svg|pdf|docx|doc|xls|xlsx|xlsm|ppt|pptx|txt|json|xml|chunk|ttf|woff|woff2|map)/g;
 const rMatchFile = /(href|src)=\"([^\":]+)\.(js|s?css|ico|icon|bmp|jpg|zip|png|svg|gif|pdf|docx|doc|xls|xlsx|xlsm|ppt|pptx|txt|json|xml|chunk|ttf|woff|woff2|map)\"/g;
+const rMatchFileJS = /(href|src)=\"([^\":]+)\.(js|s?css||map)\"/g;
 
 var registeredBasePaths = [];
 
-function rebuildHTMLIndex(source, basePath) {
+function rebuildHTMLIndex(source, basePath, matcher = rMatchFile) {
   /** @type {string} */
   indexHTMLSource = source;
   if (basePath.endsWith("/"))
     basePath = basePath.substr(0, basePath.length - 1);
   indexHTMLSource = indexHTMLSource.replace(
-    rMatchFile,
+    matcher,
     (match, propName, fileName, fileType, offset) => {
       if (fileName.startsWith(basePath)) {
         return match;
@@ -69,6 +70,7 @@ function InitReactWebSocket(app, basePath, port) {
 
       wss.handleUpgrade(req, req.socket, req.headers, async (ws) => {
         b.emit(ws);
+        b.emit(ws);
         ws.on('message', (message) => {
           b.send(message);
         });
@@ -89,39 +91,7 @@ function InitReactWebSocket(app, basePath, port) {
   });
 }
 
-function InitReactWebSocket(app, basePath, port) {
-  const b = new ws(`ws://localhost:${port}/sockjs-node`, {});
-  const wss = new ws.Server({ server: app, path: '/sockjs-node' });
 
-
-  app.use(async (req, res, next) => {
-
-    if (req.url === "/sockjs-node") {
-
-      try {
-        wss.handleUpgrade(req, req.socket, req.headers, async (ws) => {
-          b.emit(ws);
-          ws.on('message', (message) => {
-            b.send(message);
-          });
-          b.on('message', (message) => {
-            var msg = message.toJSON();
-            var result = {};
-            var decoded = Buffer.from(msg, { encoding: 'utf-8' });
-
-            ws.send(decoded.toString("utf-8"));
-          });
-        });
-
-
-        return;
-      } catch (e) {
-        console.error(e);
-      }
-    }
-    next();
-  });
-}
 
 function InitDevelopmentServer(app, basePath, port) {
 
@@ -180,7 +150,14 @@ function InitDevelopmentServer(app, basePath, port) {
       isIndex = true;
     }
     if (!_newpath.startsWith("/")) _newpath = "/" + _newpath;
-
+    if (!isIndex) {
+      if (_newpath.startsWith("/" + basePath)) {
+        _newpath = _newpath.substr(basePath.length + 1);
+      }
+    }
+    if (isIndex) {
+      _newpath = "/" + basePath;
+    }
     var _res = await fetch("http://localhost:" + port.toString() + _newpath, {
       method: req.method,
       headers: { ...req.headers, referer: null, host: null },
@@ -194,7 +171,7 @@ function InitDevelopmentServer(app, basePath, port) {
         var indexSource = await _res.text().catch(console.error);
         res.setHeader("content-type", "text/html; charset=utf-8");
         res.status(200);
-        res.send(rebuildHTMLIndex(indexSource, ("/" + basePath).replace(/\/\//g, "/")));
+        res.send(rebuildHTMLIndex(indexSource, ("/" + basePath).replace(/\/\//g, "/"), rMatchFileJS));
       }
       else {
         var _resbody = _res.body;
