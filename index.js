@@ -62,13 +62,15 @@ function InitProductionServer(app, basePath, buildPath, port) {
 function InitReactWebSocket(app, basePath, port) {
   const b = new ws(`ws://localhost:${port}/sockjs-node`, {});
   const wss = new ws.Server({ server: app, path: '/sockjs-node' });
-
+  b.on('error', console.error);
+  wss.on('error', console.error);
 
   app.use(async (req, res, next) => {
 
     if (req.url === "/sockjs-node") {
 
       wss.handleUpgrade(req, req.socket, req.headers, async (ws) => {
+        ws.on('error', console.error);
         b.emit(ws);
         b.emit(ws);
         ws.on('message', (message) => {
@@ -158,6 +160,8 @@ function InitDevelopmentServer(app, basePath, port) {
     if (isIndex) {
       _newpath = "/" + basePath;
     }
+    if (!_newpath.startsWith("/")) _newpath = "/" + _newpath;
+
     var _res = await fetch("http://localhost:" + port.toString() + _newpath, {
       method: req.method,
       headers: { ...req.headers, referer: null, host: null },
