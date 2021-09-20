@@ -103,8 +103,13 @@ function InitDevelopmentServer(app, basePath, port) {
     console.error(e);
   }
 
-  app.use("*", async (req, res, next) => {
+  app.use("*", (async (basePath, port, req, res, next) => {
     var _newpath = req.baseUrl.toString().replace(/\/\//g, "/");
+    if (!_newpath.startsWith(basePath) && basePath !== "/" && basePath !== "") {
+      next();
+      return;
+    }
+    if (_newpath === "") _newpath = "/";
     const referer = req.headers.referer;
     var longPath = [];
     basePath = basePath.replace(/\/\//g, "/");
@@ -185,7 +190,7 @@ function InitDevelopmentServer(app, basePath, port) {
     } else {
       res.send("404");
     }
-  });
+  }).bind(this, basePath, port));
 }
 
 /**
