@@ -95,7 +95,7 @@ function InitReactWebSocket(app, basePath, port) {
 
 
 
-function InitDevelopmentServer(app, basePath, port) {
+function InitDevelopmentServer(app, basePath, port, disableResetPath) {
 
   try {
     InitReactWebSocket(app, basePath, port);
@@ -162,7 +162,7 @@ function InitDevelopmentServer(app, basePath, port) {
         _newpath = _newpath.substr(basePath.length + 1);
       }
     }
-    if (isIndex) {
+    if (isIndex && !disableResetPath) {
       _newpath = "/" + basePath;
     }
     if (!_newpath.startsWith("/")) _newpath = "/" + _newpath;
@@ -201,15 +201,15 @@ function InitDevelopmentServer(app, basePath, port) {
  * @param {Number} port 
  * @param {Boolean} disableAutoStartDevServer 
  */
-async function UseReactServer(app, basePath = "/", clientPath = null, port = 3000, disableAutoStartDevServer = true) {
+async function UseReactServer(app, basePath = "/", clientPath = null, port = 3000, disableAutoStartDevServer = true, disableResetPath = false) {
   registeredBasePaths.push([basePath, port]);
   var buildpath = path.join(process.cwd(), clientPath, "build");
   if (fs.existsSync(buildpath)) {
-    InitProductionServer(app, basePath, buildpath);
+    InitProductionServer(app, basePath, buildpath, disableResetPath);
   } else {
     fetch("http://localhost:" + port + "/", {
       method: "get",
-    }).then(p => { InitDevelopmentServer(app, basePath, port); }).catch((p) => {
+    }).then(p => { InitDevelopmentServer(app, basePath, port, disableResetPath); }).catch((p) => {
       if (!disableAutoStartDevServer) {
         var cmd = require("./CommandLineHost");
         var _client = path.join(__dirname, "client");
@@ -221,7 +221,7 @@ async function UseReactServer(app, basePath = "/", clientPath = null, port = 300
         );
         c.start();
       }
-      InitDevelopmentServer(app, basePath, port);
+      InitDevelopmentServer(app, basePath, port, disableResetPath);
     });
   }
 }
