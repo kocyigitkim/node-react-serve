@@ -103,7 +103,7 @@ function InitDevelopmentServer(app, basePath, port, disableResetPath) {
     console.error(e);
   }
 
-  app.use("*", (async (basePath, port, req, res, next) => {
+  app.use("*", (async (basePath, port, disableResetPath, req, res, next) => {
     var _newpath = req.baseUrl.toString().replace(/\/\//g, "/");
     if (!_newpath.startsWith(basePath) && basePath !== "/" && basePath !== "") {
       next();
@@ -121,23 +121,22 @@ function InitDevelopmentServer(app, basePath, port, disableResetPath) {
       _newpath = _newpath.substr(1);
     }
 
-    if (referer && referer.length > 0) {
-      var pathname = new URL(referer).pathname;
-      try {
-        longPath = registeredBasePaths.filter(bp => pathname.toLowerCase().startsWith(bp[0].toLowerCase())).sort((a, b) => a[0].length - b[0].length).reverse()[0];
-        basePath = longPath[0];
-        port = longPath[1];
-        if (basePath.startsWith("/")) {
-          basePath = basePath.substr(1);
-        }
-
-        if (!_newpath.toLowerCase().startsWith(basePath.toLowerCase())) {
-          //     _newpath = basePath + _newpath;
-        }
-
-      } catch (err) {
-        console.error(err);
+    try {
+      var pathname = new URL(referer || ("http://localhost" + req.originalUrl)).pathname;
+      longPath = registeredBasePaths.filter(bp => pathname.toLowerCase().startsWith(bp[0].toLowerCase())).sort((a, b) => a[0].length - b[0].length).reverse()[0];
+      basePath = longPath[0];
+      port = longPath[1];
+      disableResetPath = longPath[2];
+      if (basePath.startsWith("/")) {
+        basePath = basePath.substr(1);
       }
+
+      if (!_newpath.toLowerCase().startsWith(basePath.toLowerCase())) {
+        //     _newpath = basePath + _newpath;
+      }
+
+    } catch (err) {
+      console.error(err);
     }
 
     if ((!referer || longPath.length === 0) && !_newpath.toLowerCase().startsWith(basePath.toLowerCase())) {
@@ -163,7 +162,7 @@ function InitDevelopmentServer(app, basePath, port, disableResetPath) {
       }
     }
     if (isIndex && !disableResetPath) {
-      _newpath = "/" + basePath;
+      _newpath = "/";
     }
     if (!_newpath.startsWith("/")) _newpath = "/" + _newpath;
 
@@ -190,7 +189,7 @@ function InitDevelopmentServer(app, basePath, port, disableResetPath) {
     } else {
       res.send("404");
     }
-  }).bind(this, basePath, port));
+  }).bind(this, basePath, port, disableResetPath));
 }
 
 /**
@@ -202,28 +201,31 @@ function InitDevelopmentServer(app, basePath, port, disableResetPath) {
  * @param {Boolean} disableAutoStartDevServer 
  */
 async function UseReactServer(app, basePath = "/", clientPath = null, port = 3000, disableAutoStartDevServer = true, disableResetPath = false) {
-  registeredBasePaths.push([basePath, port]);
+  registeredBasePaths.push([basePath, port, disableResetPath]);
   var buildpath = path.join(process.cwd(), clientPath, "build");
-  if (fs.existsSync(buildpath)) {
-    InitProductionServer(app, basePath, buildpath, disableResetPath);
-  } else {
-    fetch("http://localhost:" + port + "/", {
-      method: "get",
-    }).then(p => { InitDevelopmentServer(app, basePath, port, disableResetPath); }).catch((p) => {
-      if (!disableAutoStartDevServer) {
-        var cmd = require("./CommandLineHost");
-        var _client = path.join(__dirname, "client");
-        if (clientPath) _client = clientPath;
-        var c = new cmd(
-          /^win/.test(process.platform) ? "npm.cmd" : "npm",
-          ["run", "start"],
-          _client
-        );
-        c.start();
-      }
+
+  fetch("http://localhost:" + port + "/", {
+    method: "get",
+  }).then(p => { InitDevelopmentServer(app, basePath, port, disableResetPath); }).catch((p) => {
+    if (!disableAutoStartDevServer) {
+      var cmd = require("./CommandLineHost");
+      var _client = path.join(__dirname, "client");
+      if (clientPath) _client = clientPath;
+      var c = new cmd(
+        /^win/.test(process.platform) ? "npm.cmd" : "npm",
+        ["run", "start"],
+        _client
+      );
+      c.start();
       InitDevelopmentServer(app, basePath, port, disableResetPath);
-    });
-  }
+    }
+    else {
+      if (fs.existsSync(buildpath)) {
+        InitProductionServer(app, basePath, buildpath, disableResetPath);
+      }
+    }
+  });
+
 }
 
 module.exports = UseReactServer;
